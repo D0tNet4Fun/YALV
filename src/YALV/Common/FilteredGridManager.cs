@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -14,6 +15,7 @@ namespace YALV.Common
     public class FilteredGridManager
         : FilteredGridManagerBase
     {
+        public static readonly DependencyProperty IdProperty = DependencyProperty.RegisterAttached("Id", typeof(string), typeof(DataGridTextColumn));
         public static readonly DependencyProperty FilterTextBoxProperty = DependencyProperty.RegisterAttached("FilterTextBox", typeof(TextBox), typeof(DataGridTextColumn));
 
         public FilteredGridManager(DataGrid dg, Panel txtSearchPanel, KeyEventHandler keyUpEvent)
@@ -47,6 +49,7 @@ namespace YALV.Common
                 foreach (ColumnItem item in columns)
                 {
                     DataGridTextColumn col = new DataGridTextColumn();
+                    col.SetValue(IdProperty, item.Field);
                     col.Header = item.Header;
                     if (item.Alignment == CellAlignment.CENTER && _centerCellStyle != null)
                         col.CellStyle = _centerCellStyle;
@@ -89,6 +92,19 @@ namespace YALV.Common
                 {
                     _dg.ColumnReordered += OnColumnReordered;
                 }
+            }
+        }
+        public IEnumerable<ColumnSettings> GetColumnSettings()
+        {
+            foreach (var column in _dg.Columns.OrderBy(c => c.DisplayIndex))
+            {
+                var columnSettings = new ColumnSettings
+                {
+                    Id = (string)column.GetValue(IdProperty),
+                    Width = (int)column.ActualWidth,
+                    DisplayIndex = column.DisplayIndex
+                };
+                yield return columnSettings;
             }
         }
 

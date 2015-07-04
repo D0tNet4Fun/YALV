@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml;
+using System.Xml.Linq;
 using YALV.Core.Domain;
 using YALV.Core.Providers;
 
@@ -33,7 +35,7 @@ namespace YALV.Core
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.TraceError("Error saving Favorites list [{0}]:\r\n{1}\r\n{2}",path,ex.Message,ex.StackTrace);
+                Trace.TraceError("Error saving Favorites list [{0}]:\r\n{1}\r\n{2}", path, ex.Message, ex.StackTrace);
                 throw;
             }
             finally
@@ -43,7 +45,7 @@ namespace YALV.Core
                 if (fileStream != null)
                     fileStream.Close();
             }
-           
+
         }
 
         public static IList<PathItem> ParseFolderFile(string path)
@@ -80,7 +82,7 @@ namespace YALV.Core
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.TraceError("Error parsing Favorites list [{0}]:\r\n{1}\r\n{2}", path, ex.Message, ex.StackTrace);
+                Trace.TraceError("Error parsing Favorites list [{0}]:\r\n{1}\r\n{2}", path, ex.Message, ex.StackTrace);
                 throw;
             }
             finally
@@ -103,7 +105,74 @@ namespace YALV.Core
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.TraceError("Error parsing log file [{0}]:\r\n{1}\r\n{2}", path, ex.Message, ex.StackTrace);
+                Trace.TraceError("Error parsing log file [{0}]:\r\n{1}\r\n{2}", path, ex.Message, ex.StackTrace);
+                throw;
+            }
+        }
+
+        public static ColumnSettings[] ParseSettings(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return new ColumnSettings[0];
+            }
+
+            var xml = XDocument.Load(path);
+            var columnsElement = xml.Descendants("columns").SingleOrDefault();
+            if (columnsElement == null)
+            {
+                Trace.TraceWarning("Column settings not found in file {0}", path);
+                return new ColumnSettings[0];
+            }
+
+            var columnElements = columnsElement.Descendants("column");
+            try
+            {
+                var array = columnElements.Select(x =>
+                    new ColumnSettings
+                    {
+                        Id = x.Attribute("id").Value,
+                        DisplayIndex = int.Parse(x.Attribute("displayIndex").Value),
+                        Width = double.Parse(x.Attribute("width").Value),
+                    }).ToArray();
+                return array;
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Error parsing column settings from file {0}:\r\n{1}", path, ex.ToString());
+                throw;
+            }
+        }
+
+        public static void SaveSettings(ColumnSettings[] columnSettingsCollection, string path)
+        {
+            var xml = File.Exists(path) ? XDocument.Load(path) : new XDocument();
+
+            var columnsElement = xml.Descendants("columns").SingleOrDefault();
+            if (columnsElement == null)
+            {
+                if (xml.Root == null)
+                {
+                    var root = new XElement("settings");
+                    xml.Add(root);
+                }
+                columnsElement = new XElement("columns");
+                xml.Root.Add(columnsElement);
+            }
+
+            try
+            {
+                var columnElements = from columnSettings in columnSettingsCollection
+                                     select new XElement("column",
+                                         new XAttribute("id", columnSettings.Id),
+                                         new XAttribute("displayIndex", columnSettings.DisplayIndex),
+                                         new XAttribute("width", columnSettings.Width));
+                columnsElement.ReplaceAll(columnElements);
+                xml.Save(path);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Error saving column settings in file {0}:\r\n{1}", path, ex.ToString());
                 throw;
             }
         }

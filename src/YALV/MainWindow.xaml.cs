@@ -58,6 +58,7 @@ namespace YALV
             this.Closing += delegate
             {
                 dgItems.SelectionChanged -= dgItems_SelectionChanged;
+                _vm.OnApplicationShutdown();
                 _vm.Dispose();
             };
         }

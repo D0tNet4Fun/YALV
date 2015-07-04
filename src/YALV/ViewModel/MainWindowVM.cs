@@ -918,6 +918,19 @@ namespace YALV.ViewModel
             }
         }
 
+        public void OnApplicationShutdown()
+        {
+            try
+            {
+                var collection = GridManager.GetColumnSettings().ToArray();
+                DataService.SaveSettings(collection, Constants.SETTINGS_FILE_PATH);
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        }
+
         #endregion
 
         #region Privates
@@ -950,7 +963,7 @@ namespace YALV.ViewModel
             FileList.Clear();
             SelectedFolder = null;
             string path = Constants.FOLDERS_FILE_PATH;
-            IList<PathItem> folders=null;
+            IList<PathItem> folders = null;
             try
             {
                 folders = DataService.ParseFolderFile(path);
@@ -1091,15 +1104,15 @@ namespace YALV.ViewModel
             IList<LogItem> res = null;
             try
             {
-                 res= DataService.ParseLogFile(path);
+                res = DataService.ParseLogFile(path);
             }
             catch (Exception ex)
             {
                 string message = String.Format((string)Resources.GlobalHelper_ParseLogFile_Error_Text, path, ex.Message);
-                MessageBox.Show(message, Resources.GlobalHelper_ParseLogFile_Error_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);                
-               res=new List<LogItem>();
+                MessageBox.Show(message, Resources.GlobalHelper_ParseLogFile_Error_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                res = new List<LogItem>();
             }
-            
+
             //System.Threading.Thread.Sleep(200);
 
             BackgroundWorker worker = sender as BackgroundWorker;
@@ -1181,7 +1194,7 @@ namespace YALV.ViewModel
         {
             if (GridManager != null)
             {
-                IList<ColumnItem> dgColumns = new List<ColumnItem>()
+                var dgColumns = new List<ColumnItem>()
                 {
                     new ColumnItem("Id", 37, null, CellAlignment.CENTER,string.Empty){Header = Resources.MainWindowVM_InitDataGrid_IdColumn_Header},
                     new ColumnItem("TimeStamp", 120, null, CellAlignment.CENTER, GlobalHelper.DisplayDateTimeFormat){Header = Resources.MainWindowVM_InitDataGrid_TimeStampColumn_Header},
@@ -1198,6 +1211,26 @@ namespace YALV.ViewModel
                     //new ColumnItem("Delta", 60, null, CellAlignment.CENTER, null, "Δ"),
                     //new ColumnItem("Path", 50)
                 };
+
+                // override default settings if neeeded
+                var columnSettingsArray = DataService.ParseSettings(Constants.SETTINGS_FILE_PATH);
+                if (columnSettingsArray.Length > 0)
+                {
+                    var map = (from columnItem in dgColumns
+                               join columnSettings in columnSettingsArray
+                                   on columnItem.Field equals columnSettings.Id
+                               select new { columnItem, columnSettings })
+                              .ToDictionary(x => x.columnItem, x => x.columnSettings);
+
+                    foreach (var kvp in map)
+                    {
+                        var column = kvp.Key;
+                        var settings = kvp.Value;
+                        column.Width = settings.Width;
+                    }
+
+                    dgColumns.Sort(new ColumnComparer(map));
+                }
                 GridManager.BuildDataGrid(dgColumns);
                 GridManager.AssignSource(new Binding(MainWindowVM.PROP_Items) { Source = this, Mode = BindingMode.OneWay });
                 GridManager.OnBeforeCheckFilter = levelCheckFilter;
@@ -1579,5 +1612,20 @@ namespace YALV.ViewModel
         }
 
         #endregion
+
+        public class ColumnComparer : IComparer<ColumnItem>
+        {
+            private readonly IDictionary<ColumnItem, ColumnSettings> _map;
+
+            public ColumnComparer(IDictionary<ColumnItem, ColumnSettings> map)
+            {
+                _map = map;
+            }
+
+            public int Compare(ColumnItem x, ColumnItem y)
+            {
+                return _map[x].DisplayIndex.CompareTo(_map[y].DisplayIndex);
+            }
+        }
     }
 }
