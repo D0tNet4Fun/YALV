@@ -255,7 +255,7 @@
             Value="False" />
         <Setter
             Property="CanUserReorderColumns"
-            Value="False" />
+            Value="True" />
         <Setter
             Property="CanUserResizeColumns"
             Value="True" />
