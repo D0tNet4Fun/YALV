@@ -35,6 +35,7 @@ namespace YALV.ViewModel
             CommandOpenSelectedFolder = new CommandRelay(commandOpenSelectedFolderExecute, commandOpenSelectedFolderCanExecute);
             CommandIncreaseInterval = new CommandRelay(commandIncreaseIntervalExecute, p => true);
             CommandDecreaseInterval = new CommandRelay(commandDecreaseIntervalExecute, p => true);
+            CommandSelectColumns = new CommandRelay(commandSelectColumnsExecute, _ => true);
             CommandAbout = new CommandRelay(commandAboutExecute, p => true);
 
             FileList = new ObservableCollection<FileItem>();
@@ -133,6 +134,11 @@ namespace YALV.ViewModel
         /// OpenSelectedFolder Command
         /// </summary>
         public ICommandAncestor CommandOpenSelectedFolder { get; protected set; }
+
+        /// <summary>
+        /// SelectColumns command
+        /// </summary>
+        public ICommandAncestor CommandSelectColumns { get; protected set; }
 
         /// <summary>
         /// About Command
@@ -370,6 +376,13 @@ namespace YALV.ViewModel
         protected virtual bool commandOpenSelectedFolderCanExecute(object parameter)
         {
             return SelectedFolder != null;
+        }
+
+        protected virtual object commandSelectColumnsExecute(object parameter)
+        {
+            var win = new SelectColumns() { Owner = _callingWin as Window };
+            win.ShowDialog(GridManager);
+            return null;
         }
 
         protected virtual object commandAboutExecute(object parameter)
@@ -1227,10 +1240,12 @@ namespace YALV.ViewModel
                         var column = kvp.Key;
                         var settings = kvp.Value;
                         column.Width = settings.Width;
+                        column.Visible = settings.Visible;
                     }
 
                     dgColumns.Sort(new ColumnComparer(map));
                 }
+
                 GridManager.BuildDataGrid(dgColumns);
                 GridManager.AssignSource(new Binding(MainWindowVM.PROP_Items) { Source = this, Mode = BindingMode.OneWay });
                 GridManager.OnBeforeCheckFilter = levelCheckFilter;
@@ -1624,6 +1639,18 @@ namespace YALV.ViewModel
 
             public int Compare(ColumnItem x, ColumnItem y)
             {
+                if (x.Field == y.Field)
+                {
+                    return 0;
+                }
+                if (x.Visible && !y.Visible)
+                {
+                    return -1;
+                }
+                if (!x.Visible && y.Visible)
+                {
+                    return 1;
+                }
                 return _map[x].DisplayIndex.CompareTo(_map[y].DisplayIndex);
             }
         }

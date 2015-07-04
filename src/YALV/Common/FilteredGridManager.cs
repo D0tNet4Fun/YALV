@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -57,6 +58,7 @@ namespace YALV.Common
                         col.MinWidth = item.MinWidth.Value;
                     if (item.Width != null)
                         col.Width = item.Width.Value;
+                    col.Visibility = item.Visible ? Visibility.Visible : Visibility.Collapsed;
 
                     Binding bind = new Binding(item.Field) { Mode = BindingMode.OneWay };
                     bind.ConverterCulture = CultureInfo.GetCultureInfo(Resources.CultureName);
@@ -79,6 +81,7 @@ namespace YALV.Common
                         txt.Text = string.Empty;
                         txt.AcceptsReturn = false;
                         txt.SetBinding(TextBox.WidthProperty, BuildOneWayLinkedBinding(col, DataGridColumn.ActualWidthProperty, _adjConv, "-2"));
+                        txt.SetBinding(TextBox.VisibilityProperty, BuildOneWayLinkedBinding(col, DataGridColumn.VisibilityProperty));
                         _filterPropertyList.Add(item.Field);
                         if (_keyUpEvent != null)
                             txt.KeyUp += _keyUpEvent;
@@ -94,6 +97,7 @@ namespace YALV.Common
                 }
             }
         }
+
         public IEnumerable<ColumnSettings> GetColumnSettings()
         {
             foreach (var column in _dg.Columns.OrderBy(c => c.DisplayIndex))
@@ -102,9 +106,50 @@ namespace YALV.Common
                 {
                     Id = (string)column.GetValue(IdProperty),
                     Width = (int)column.ActualWidth,
-                    DisplayIndex = column.DisplayIndex
+                    DisplayIndex = column.DisplayIndex,
+                    Visible = column.Visibility == Visibility.Visible
                 };
                 yield return columnSettings;
+            }
+        }
+
+        public ColumnVisibilitySettings GetColumnVisibilitySettings()
+        {
+            var settings = new ColumnVisibilitySettings();
+            var map = GetColumnVisibilityMap();
+            foreach (var item in map)
+            {
+                var show = item.Column.Visibility == Visibility.Visible;
+                item.ColumnVisibilitySettingsProperty.SetValue(settings, show, null);
+            }
+            return settings;
+        }
+
+        public void UpdateColumVisibilitySettings(ColumnVisibilitySettings settings)
+        {
+            var map = GetColumnVisibilityMap();
+            foreach (var tuple in map)
+            {
+                var shouldBeVisibile = (bool)tuple.ColumnVisibilitySettingsProperty.GetValue(settings, null);
+                var textBox = (TextBox)tuple.Column.GetValue(FilterTextBoxProperty);
+                var isVisible = tuple.Column.Visibility == Visibility.Visible;
+
+                if (shouldBeVisibile && !isVisible)
+                {
+                    tuple.Column.Visibility = Visibility.Visible;
+                    if (textBox != null)
+                    {
+                        textBox.Visibility = Visibility.Visible;
+                    }
+                }
+                else if (!shouldBeVisibile && isVisible)
+                {
+                    tuple.Column.Visibility = Visibility.Collapsed;
+                    if (textBox != null)
+                    {
+                        textBox.Visibility = Visibility.Collapsed;
+                    }
+                }
             }
         }
 
@@ -132,6 +177,43 @@ namespace YALV.Common
             };
         }
 
+        private IEnumerable<ColumnVisibilityTuple> GetColumnVisibilityMap()
+        {
+            var query = (from property in typeof(ColumnVisibilitySettings).GetProperties()
+                         where property.PropertyType == typeof(bool)
+                         from column in _dg.Columns
+                         let columnId = (string)column.GetValue(IdProperty)
+                         where Matches(property.Name, columnId)
+                         select new ColumnVisibilityTuple
+                         {
+                             Column = column,
+                             ColumnVisibilitySettingsProperty = property
+                         });
+            return query;
+        }
+
+        private static bool Matches(string visibilityPropertyName, string columnId)
+        {
+            // return true if visibility property = ShowXXX and columnId = XXX; also handles custom mappings
+            var name = visibilityPropertyName.Replace("Show", string.Empty);
+
+            if (name.Equals(columnId, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return true;
+            }
+
+            // custom mappings
+            foreach (var tuple in new[] { Tuple.Create("Application", "App") })
+            {
+                if (name.Equals(tuple.Item1, StringComparison.InvariantCultureIgnoreCase) &&
+                    columnId.Equals(tuple.Item2, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void OnColumnReordered(object sender, DataGridColumnEventArgs e)
         {
             // move the corresponding filter text box along with the column;
@@ -151,6 +233,12 @@ namespace YALV.Common
                 _dg.ColumnReordered -= OnColumnReordered;
             }
             base.OnDispose();
+        }
+
+        class ColumnVisibilityTuple
+        {
+            public DataGridColumn Column { get; set; }
+            public PropertyInfo ColumnVisibilitySettingsProperty { get; set; }
         }
     }
 }

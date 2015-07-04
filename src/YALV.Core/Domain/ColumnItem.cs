@@ -11,6 +11,7 @@ namespace YALV.Core.Domain
         public double? MinWidth { get; set; }
         public double? Width { get; set; }
         public CellAlignment Alignment { get; set; }
+        public bool Visible { get; set; }
 
         public ColumnItem(string field, double? minWidth, double? width)
             : this(field, minWidth, width, CellAlignment.DEFAULT, string.Empty, field)
@@ -35,6 +36,7 @@ namespace YALV.Core.Domain
             Alignment = align;
             StringFormat = stringFormat;
             Header = header;
+            Visible = true; // for backwards compatibility
         }
     }
 

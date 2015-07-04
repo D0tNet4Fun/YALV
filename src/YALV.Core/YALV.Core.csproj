@@ -42,11 +42,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Domain\ColumnSettings.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="DataService.cs" />
     <Compile Include="Domain\BindableObject.cs" />
     <Compile Include="Domain\ColumnItem.cs" />
+    <Compile Include="Domain\ColumnSettings.cs" />
+    <Compile Include="Domain\ColumnVisibilitySettings.cs" />
     <Compile Include="Domain\DisposableObject.cs" />
     <Compile Include="Domain\EntriesProviderType.cs" />
     <Compile Include="Domain\FileItem.cs" />

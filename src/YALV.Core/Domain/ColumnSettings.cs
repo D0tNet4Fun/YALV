@@ -4,11 +4,12 @@ using System.Diagnostics;
 namespace YALV.Core.Domain
 {
     [Serializable]
-    [DebuggerDisplay("#{DisplayIndex} {Id,nq} Width={Width}px")]
+    [DebuggerDisplay("#{DisplayIndex} {Id,nq} Width={Width}px Visible={Visible}")]
     public class ColumnSettings
     {
         public string Id { get; set; }
         public int DisplayIndex { get; set; }
         public double Width { get; set; }
+        public bool Visible { get; set; }
     }
 }
