@@ -49,6 +49,8 @@ namespace YALV.ViewModel
             IsFileSelectionEnabled = false;
             IsLoading = false;
 
+            _cancellationTokenSource = new CancellationTokenSource();
+
             _selectAll = true;
             _selectDebug = _selectInfo = _selectWarn = _selectError = _selectFatal = false;
             _showLevelDebug = _showLevelInfo = _showLevelWarn = _showLevelError = _showLevelFatal = true;
@@ -71,6 +73,12 @@ namespace YALV.ViewModel
 
             if (GridManager != null)
                 GridManager.Dispose();
+
+            lock (_cancellationLock)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+            }
 
             Items.Clear();
             FileList.Clear();
@@ -962,7 +970,9 @@ namespace YALV.ViewModel
         private readonly TaskScheduler _taskScheduler;
         private readonly object _allItemsLock = new object();
         private readonly object _updateActionCountLock = new object();
+        private readonly object _cancellationLock = new object();
         private int _updateActionCount;
+        private CancellationTokenSource _cancellationTokenSource;
 
         private bool _loadingFileList = false;
 
@@ -1020,22 +1030,43 @@ namespace YALV.ViewModel
 
         private void loadLogFileAsync(string path)
         {
-            UpdateItemsAsync(() => loadLogFile(path), path);
+            if (!IsFileSelectionEnabled)
+            {
+                ReplaceCancellationTokenSource();
+            }
+
+            CancellationToken currentCancellationToken;
+            lock (_cancellationLock)
+            {
+                currentCancellationToken = _cancellationTokenSource.Token;
+            }
+            UpdateItemsAsync(() => loadLogFile(path, currentCancellationToken), currentCancellationToken, path);
         }
 
-        private void loadLogFile(string path)
+        private void loadLogFile(string path, CancellationToken cancellationToken)
         {
             Debug.Print("Started loading items from file {0}", path);
-            var items = DataService.ParseLogFile(path).ToList();
+            var items = DataService.ParseLogFile(path);
+            var itemList = new List<LogItem>();
+            long count = 0;
+            foreach (var item in items)
+            {
+                if (count++ % 1000 == 0 && cancellationToken.IsCancellationRequested)
+                {
+                    Debug.Print("Canceled loading items from file {0}", path);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                itemList.Add(item);
+            }
             lock (_allItemsLock)
             {
                 if (!IsFileSelectionEnabled)
                 {
-                    _allItems = items;
+                    _allItems = itemList;
                 }
                 else
                 {
-                    _allItems = _allItems.Union(items);
+                    _allItems = _allItems.Union(itemList);
                 }
             }
             Debug.Print("Finished loading items from file {0}", path);
@@ -1043,7 +1074,7 @@ namespace YALV.ViewModel
 
         private void removeItemsAsync(string path)
         {
-            UpdateItemsAsync(() => removeItems(path));
+            UpdateItemsAsync(() => removeItems(path), CancellationToken.None);
         }
 
         private void removeItems(string path)
@@ -1113,7 +1144,7 @@ namespace YALV.ViewModel
             myJumpList.Apply();
         }
 
-        private void UpdateItemsAsync(Action allItemsUpdateAction, string path = null)
+        private void UpdateItemsAsync(Action allItemsUpdateAction, CancellationToken cancellationToken, string path = null)
         {
             // set IsLoading = true on UI thread
             IsLoading = true;
@@ -1127,23 +1158,23 @@ namespace YALV.ViewModel
                     Debug.Print("Pending update actions before update: {0}", _updateActionCount);
                 }
                 allItemsUpdateAction();
-            });
+            }, cancellationToken);
 
             // when the update items task does not complete succesffuly, show an error on the UI thread
             var uiTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
-            var showErrorOnUiTask = updateItemsTask.ContinueWith(t =>
+            var updateItemsFailedTask = updateItemsTask.ContinueWith(t =>
             {
                 lock (_updateActionCountLock)
                 {
                     _updateActionCount--;
                     Debug.Print("Pending update actions after update: {0}", _updateActionCount);
                 }
-                if (!string.IsNullOrWhiteSpace(path))
+                if (!t.IsCanceled && !string.IsNullOrWhiteSpace(path))
                 {
                     var message = String.Format(Resources.GlobalHelper_ParseLogFile_Error_Text, path, t.Exception.InnerException.Message);
                     MessageBox.Show(message, Resources.GlobalHelper_ParseLogFile_Error_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
-            }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, uiTaskScheduler);
+            }, CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion, uiTaskScheduler);
 
             // when the update items task completes successfully, start a post-process task which only runs if this is the last update action
             var postProcessTask = updateItemsTask.ContinueWith(t =>
@@ -1164,12 +1195,13 @@ namespace YALV.ViewModel
                     Debug.Print("Post-processing all items");
                     PostProcessItems();
                     Debug.Print("Done post-processing all items");
+                    ReplaceCancellationTokenSource();
                     return true;
                 }
             }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, _taskScheduler);
 
             // when the post process task completes, handle this on UI thread
-            var updateUiTask = postProcessTask.ContinueWith(t =>
+            var updateItemsSucceededTask = postProcessTask.ContinueWith(t =>
             {
                 var canUpdateUi = t.Result;
                 if (!canUpdateUi)
@@ -1191,7 +1223,7 @@ namespace YALV.ViewModel
             }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, uiTaskScheduler);
 
             // when UI is done updating set IsLoading=false on UI thread
-            Task.Factory.ContinueWhenAll(new[] { updateUiTask, showErrorOnUiTask }, t =>
+            Task.Factory.ContinueWhenAll(new[] { updateItemsSucceededTask, updateItemsFailedTask }, t =>
             {
                 lock (_updateActionCountLock)
                 {
@@ -1213,6 +1245,16 @@ namespace YALV.ViewModel
                 item1.Id = itemId++;
             }
             _allItems = list;
+        }
+
+        private void ReplaceCancellationTokenSource()
+        {
+            lock (_cancellationLock)
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = new CancellationTokenSource();
+            }
         }
 
         #endregion
