@@ -5,6 +5,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Shell;
@@ -20,9 +22,10 @@ namespace YALV.ViewModel
     public class MainWindowVM
         : BindableObject
     {
-        public MainWindowVM(IWinSimple win)
+        public MainWindowVM(IWinSimple win, TaskScheduler taskScheduler)
         {
             _callingWin = win;
+            _taskScheduler = taskScheduler;
 
             CommandExit = new CommandRelay(commandExitExecute, p => true);
             CommandOpenFile = new CommandRelay(commandOpenFileExecute, commandOpenFileCanExecute);
@@ -50,11 +53,7 @@ namespace YALV.ViewModel
             _selectDebug = _selectInfo = _selectWarn = _selectError = _selectFatal = false;
             _showLevelDebug = _showLevelInfo = _showLevelWarn = _showLevelError = _showLevelFatal = true;
 
-            bkLoader = new BackgroundWorker();
-            bkLoader.WorkerSupportsCancellation = true;
-            bkLoader.DoWork += bkLoaderRun;
-            bkLoader.RunWorkerCompleted += bkLoaderCompleted;
-
+            _allItems = new List<LogItem>();
             _dispatcherTimer = new DispatcherTimer();
             _dispatcherTimer.Tick += new EventHandler(dispatcherTimer_Tick);
 
@@ -68,15 +67,6 @@ namespace YALV.ViewModel
             {
                 _dispatcherTimer.Stop();
                 _dispatcherTimer.Tick -= dispatcherTimer_Tick;
-            }
-
-            if (bkLoader != null)
-            {
-                if (bkLoader.IsBusy)
-                    bkLoader.CancelAsync();
-                bkLoader.DoWork -= bkLoaderRun;
-                bkLoader.RunWorkerCompleted -= bkLoaderCompleted;
-                bkLoader.Dispose();
             }
 
             if (GridManager != null)
@@ -242,13 +232,13 @@ namespace YALV.ViewModel
                 foreach (FileItem item in FileList)
                 {
                     if (item.Checked)
-                        loadLogFile(item.Path, true);
+                        loadLogFileAsync(item.Path);
                 }
             }
             else
             {
                 if (FileList.Count > 0 && SelectedFile != null)
-                    loadLogFile(SelectedFile.Path);
+                    loadLogFileAsync(SelectedFile.Path);
             }
 
             return null;
@@ -492,7 +482,7 @@ namespace YALV.ViewModel
                         string path = _selectedFile.Path;
                         SelectedFileDir = !string.IsNullOrWhiteSpace(path) ? Path.GetDirectoryName(path) : string.Empty;
                         if (!IsFileSelectionEnabled)
-                            loadLogFile(path);
+                            loadLogFileAsync(path);
                     }
 
                     refreshCommandsCanExecute();
@@ -915,9 +905,9 @@ namespace YALV.ViewModel
                     if (e.PropertyName.Equals(FileItem.PROP_Checked))
                     {
                         if (newItem.Checked)
-                            loadLogFile(newItem.Path, true);
+                            loadLogFileAsync(newItem.Path);
                         else
-                            removeItems(newItem.Path);
+                            removeItemsAsync(newItem.Path);
 
                         refreshCommandsCanExecute();
                     }
@@ -969,6 +959,10 @@ namespace YALV.ViewModel
         #region Privates
 
         private IWinSimple _callingWin;
+        private readonly TaskScheduler _taskScheduler;
+        private readonly object _allItemsLock = new object();
+        private readonly object _updateActionCountLock = new object();
+        private int _updateActionCount;
 
         private bool _loadingFileList = false;
 
@@ -1024,44 +1018,43 @@ namespace YALV.ViewModel
             }
         }
 
-        private void loadLogFile(string path, bool merge = false)
+        private void loadLogFileAsync(string path)
         {
-            if (bkLoader != null)
+            UpdateItemsAsync(() => loadLogFile(path), path);
+        }
+
+        private void loadLogFile(string path)
+        {
+            Debug.Print("Started loading items from file {0}", path);
+            var items = DataService.ParseLogFile(path).ToList();
+            lock (_allItemsLock)
             {
-                while (IsLoading)
-                    GlobalHelper.DoEvents();
-
-                IsLoading = true;
-
-                RecentFileList.InsertFile(path);
-                updateJumpList();
-
-                object[] args = { path, merge };
-                bkLoader.RunWorkerAsync(args);
+                if (!IsFileSelectionEnabled)
+                {
+                    _allItems = items;
+                }
+                else
+                {
+                    _allItems = _allItems.Union(items);
+                }
             }
+            Debug.Print("Finished loading items from file {0}", path);
+        }
+
+        private void removeItemsAsync(string path)
+        {
+            UpdateItemsAsync(() => removeItems(path));
         }
 
         private void removeItems(string path)
         {
-            //Less performance
-            //for (int i = Items.Count - 1; i >= 0; i--)
-            //{
-            //    if (Items[i].Path.Equals(path, StringComparison.OrdinalIgnoreCase))
-            //        Items.RemoveAt(i);
-            //}
-
-            //Best performance
-            var selectedItems = from it in Items
-                                where (!it.Path.Equals(path, StringComparison.OrdinalIgnoreCase))
-                                select it;
-            Items = new ObservableCollection<LogItem>(selectedItems);
-
-            int itemId = 1;
-            foreach (LogItem item in Items)
-                item.Id = itemId++;
-
-            updateCounters();
+            lock (_allItemsLock)
+            {
+                _allItems = _allItems.Where(i => !i.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
+            }
         }
+
+        private IEnumerable<LogItem> _allItems;
 
         private bool deleteFile(string path)
         {
@@ -1120,98 +1113,106 @@ namespace YALV.ViewModel
             myJumpList.Apply();
         }
 
-        #endregion
-
-        #region BackgroundWorker Methods (bkLoader)
-
-        private BackgroundWorker bkLoader;
-
-        private void bkLoaderRun(object sender, DoWorkEventArgs e)
+        private void UpdateItemsAsync(Action allItemsUpdateAction, string path = null)
         {
-            object[] args = e.Argument as object[];
-            if (args == null)
-                return;
+            // set IsLoading = true on UI thread
+            IsLoading = true;
 
-            string path = args[0] != null ? args[0].ToString() : string.Empty;
-            object merge = args[1];
-            IList<LogItem> res = null;
-            try
+            // update items async on the background thread
+            var updateItemsTask = new Task(() =>
             {
-                res = DataService.ParseLogFile(path);
-            }
-            catch (Exception ex)
-            {
-                string message = String.Format((string)Resources.GlobalHelper_ParseLogFile_Error_Text, path, ex.Message);
-                MessageBox.Show(message, Resources.GlobalHelper_ParseLogFile_Error_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                res = new List<LogItem>();
-            }
-
-            //System.Threading.Thread.Sleep(200);
-
-            BackgroundWorker worker = sender as BackgroundWorker;
-            if (worker != null && worker.CancellationPending)
-            {
-                e.Cancel = true;
-                return;
-            }
-
-            e.Result = new object[] { res, merge };
-        }
-
-        private void bkLoaderCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            if (e.Error != null)
-                MessageBox.Show(String.Format(Resources.MainWindowVM_bkLoaderCompleted_UnreadableFile_Text, e.Error.ToString()), Resources.MainWindowVM_bkLoaderCompleted_UnreadableFile_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
-            else
-            {
-                if (!e.Cancelled && e.Result != null)
+                lock (_updateActionCountLock)
                 {
-                    object[] res = e.Result as object[];
-                    IList<LogItem> list = res[0] as IList<LogItem>;
-                    bool merge = (bool)res[1];
+                    _updateActionCount++;
+                    Debug.Print("Pending update actions before update: {0}", _updateActionCount);
+                }
+                allItemsUpdateAction();
+            });
 
-                    if (merge)
+            // when the update items task does not complete succesffuly, show an error on the UI thread
+            var uiTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+            var showErrorOnUiTask = updateItemsTask.ContinueWith(t =>
+            {
+                lock (_updateActionCountLock)
+                {
+                    _updateActionCount--;
+                    Debug.Print("Pending update actions after update: {0}", _updateActionCount);
+                }
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    var message = String.Format(Resources.GlobalHelper_ParseLogFile_Error_Text, path, t.Exception.InnerException.Message);
+                    MessageBox.Show(message, Resources.GlobalHelper_ParseLogFile_Error_Title, MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                }
+            }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, uiTaskScheduler);
+
+            // when the update items task completes successfully, start a post-process task which only runs if this is the last update action
+            var postProcessTask = updateItemsTask.ContinueWith(t =>
+            {
+                lock (_updateActionCountLock)
+                {
+                    _updateActionCount--;
+                    Debug.Print("Pending update actions after update: {0}", _updateActionCount);
+                    if (_updateActionCount > 0)
                     {
-                        IList<LogItem> mergeList = new List<LogItem>(Items);
-                        int startId = mergeList.Count;
-
-                        if (list != null)
-                        {
-                            foreach (LogItem item in list)
-                                mergeList.Add(item);
-                        }
-
-                        mergeList = (from it in mergeList
-                                     orderby it.TimeStamp ascending
-                                     select it).ToList<LogItem>();
-
-                        int itemId = 1;
-                        foreach (LogItem item in mergeList)
-                            item.Id = itemId++;
-
-                        Items.Clear();
-                        Items = new ObservableCollection<LogItem>(mergeList);
-                    }
-                    else
-                    {
-                        Items.Clear();
-                        if (list != null)
-                            Items = new ObservableCollection<LogItem>(list);
-                    }
-
-                    updateCounters();
-
-                    if (Items.Count > 0)
-                    {
-                        var lastItem = (from it in Items
-                                        where levelCheckFilter(it)
-                                        select it).LastOrDefault<LogItem>();
-
-                        SelectedLogItem = lastItem != null ? lastItem : Items[Items.Count - 1];
+                        Debug.Print("Delaying post-processing because {0} update actions are pending", _updateActionCount);
+                        return false;
                     }
                 }
+
+                lock (_allItemsLock)
+                {
+                    Debug.Print("Post-processing all items");
+                    PostProcessItems();
+                    Debug.Print("Done post-processing all items");
+                    return true;
+                }
+            }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, _taskScheduler);
+
+            // when the post process task completes, handle this on UI thread
+            var updateUiTask = postProcessTask.ContinueWith(t =>
+            {
+                var canUpdateUi = t.Result;
+                if (!canUpdateUi)
+                {
+                    return;
+                }
+
+                Debug.Print("Updating UI");
+                Items.Clear();
+                Items = new ObservableCollection<LogItem>(_allItems);
+                updateCounters();
+
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    RecentFileList.InsertFile(path);
+                }
+                updateJumpList();
+                Debug.Print("Done updating UI");
+            }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, uiTaskScheduler);
+
+            // when UI is done updating set IsLoading=false on UI thread
+            Task.Factory.ContinueWhenAll(new[] { updateUiTask, showErrorOnUiTask }, t =>
+            {
+                lock (_updateActionCountLock)
+                {
+                    IsLoading = _updateActionCount > 0;
+                }
+            }, CancellationToken.None, TaskContinuationOptions.None, uiTaskScheduler);
+
+            // finnaly, start this task chain
+            updateItemsTask.Start(_taskScheduler);
+        }
+
+        private void PostProcessItems()
+        {
+            var list = _allItems.ToList();
+            list.Sort((x, y) => x.TimeStamp.CompareTo(y.TimeStamp));
+            var itemId = 1;
+            foreach (var item1 in list)
+            {
+                item1.Id = itemId++;
             }
-            IsLoading = false;
+            _allItems = list;
         }
 
         #endregion

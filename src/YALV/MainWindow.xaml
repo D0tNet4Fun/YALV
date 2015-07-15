@@ -58,7 +58,7 @@
     <Grid
         Name="contentGrid"
         local:BusyIndicatorBehavior.BusyState="{Binding IsLoading}"
-        local:BusyIndicatorBehavior.TargetVisual="{Binding ElementName=contentGrid}">
+        local:BusyIndicatorBehavior.TargetVisual="{Binding ElementName=logItemGrid}">
         <DockPanel
             LastChildFill="True">
 
@@ -878,6 +878,7 @@
 
             <!-- RIGHT -->
             <Grid
+                Name="logItemGrid"
                 DockPanel.Dock="Right">
                 <Grid.RowDefinitions>
                     <RowDefinition
