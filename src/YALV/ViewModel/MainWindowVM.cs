@@ -1550,45 +1550,40 @@ namespace YALV.ViewModel
 
         private void updateFilteredCounters(ICollectionView filteredList)
         {
+            _itemsFilterCount = _itemsDebugFilterCount = _itemsInfoFilterCount = _itemsWarnFilterCount = _itemsErrorFilterCount = _itemsFatalFilterCount = 0;
             if (filteredList != null)
             {
-                IEnumerable<LogItem> fltList = filteredList.Cast<LogItem>();
-                if (fltList != null)
+                var fltList = filteredList.Cast<LogItem>();
+                foreach (var item in fltList)
                 {
-                    ItemsFilterCount = fltList.Count();
-
-                    ItemsDebugFilterCount = (from it in fltList
-                                             where it.Level.Equals("DEBUG", StringComparison.OrdinalIgnoreCase)
-                                             select it).Count();
-
-                    ItemsInfoFilterCount = (from it in fltList
-                                            where it.Level.Equals("INFO", StringComparison.OrdinalIgnoreCase)
-                                            select it).Count();
-
-                    ItemsWarnFilterCount = (from it in fltList
-                                            where it.Level.Equals("WARN", StringComparison.OrdinalIgnoreCase)
-                                            select it).Count();
-
-                    ItemsErrorFilterCount = (from it in fltList
-                                             where it.Level.Equals("ERROR", StringComparison.OrdinalIgnoreCase)
-                                             select it).Count();
-
-                    ItemsFatalFilterCount = (from it in fltList
-                                             where it.Level.Equals("FATAL", StringComparison.OrdinalIgnoreCase)
-                                             select it).Count();
+                    _itemsFilterCount++;
+                    switch (item.LevelIndex)
+                    {
+                        case LevelIndex.DEBUG:
+                            _itemsDebugFilterCount++;
+                            break;
+                        case LevelIndex.INFO:
+                            _itemsInfoFilterCount++;
+                            break;
+                        case LevelIndex.WARN:
+                            _itemsWarnFilterCount++;
+                            break;
+                        case LevelIndex.ERROR:
+                            _itemsErrorFilterCount++;
+                            break;
+                        case LevelIndex.FATAL:
+                            _itemsFatalFilterCount++;
+                            break;
+                    }
                 }
             }
-            else
-            {
-                ItemsFilterCount = 0;
-                ItemsDebugFilterCount = 0;
-                ItemsInfoFilterCount = 0;
-                ItemsWarnFilterCount = 0;
-                ItemsErrorFilterCount = 0;
-                ItemsFatalFilterCount = 0;
-            }
+            ItemsFilterCount = _itemsFilterCount;
+            ItemsDebugFilterCount = _itemsDebugFilterCount;
+            ItemsInfoFilterCount = _itemsInfoFilterCount;
+            ItemsWarnFilterCount = _itemsWarnFilterCount;
+            ItemsErrorFilterCount = _itemsErrorFilterCount;
+            ItemsFatalFilterCount = _itemsFatalFilterCount;
         }
-
 
         #endregion
 
