@@ -447,12 +447,17 @@ namespace YALV.ViewModel
 
                 if (_isFileSelectionEnabled)
                 {
+                    FileList.Insert(0, new AllFilesItem(FileList.ToArray()));
                     Items.Clear();
                     if (FileList.Count > 0 && SelectedFile != null)
                         SelectedFile.Checked = true;
                 }
                 else
                 {
+                    if (FileList.Count >= 1 && FileList[0] is AllFilesItem)
+                    {
+                        FileList.RemoveAt(0);
+                    }
                     Items.Clear();
                     foreach (FileItem item in FileList)
                         item.Checked = false;
@@ -914,6 +919,11 @@ namespace YALV.ViewModel
                     }
                 };
                 FileList.Add(newItem);
+            }
+
+            if (_isFileSelectionEnabled)
+            {
+                FileList.Insert(0, new AllFilesItem(FileList.ToArray()));
             }
 
             _loadingFileList = false;

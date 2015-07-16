@@ -583,4 +583,10 @@ It is a WPF Application based on .NET Framework 4.0 and written with C# language
   <data name="MainWindow_GridColumnHeaderContextMenu_SelectColumns" xml:space="preserve">
     <value>Select columns...</value>
   </data>
+  <data name="FileList_AllFiles" xml:space="preserve">
+    <value>&lt;All&gt;</value>
+  </data>
+  <data name="FileList_AllFiles_Description" xml:space="preserve">
+    <value>Select all files</value>
+  </data>
 </root>

@@ -739,6 +739,24 @@ namespace YALV.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to &lt;All&gt;.
+        /// </summary>
+        public static string FileList_AllFiles {
+            get {
+                return ResourceManager.GetString("FileList_AllFiles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Select all files.
+        /// </summary>
+        public static string FileList_AllFiles_Description {
+            get {
+                return ResourceManager.GetString("FileList_AllFiles_Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Filter {0}.
         /// </summary>
         public static string FilteredGridManager_BuildDataGrid_FilterTextBox_Tooltip {
