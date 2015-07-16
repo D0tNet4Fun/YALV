@@ -1239,10 +1239,31 @@ namespace YALV.ViewModel
         {
             var list = _allItems.ToList();
             list.Sort((x, y) => x.TimeStamp.CompareTo(y.TimeStamp));
-            var itemId = 1;
-            foreach (var item1 in list)
+
+            _itemsDebugCount = _itemsInfoCount = _itemsWarnCount = _itemsErrorCount = _itemsFatalCount = 0;
+            var id = 1;
+            foreach (var item in list)
             {
-                item1.Id = itemId++;
+                item.Id = id++;
+                var levelIndex = item.LevelIndex;
+                switch (levelIndex)
+                {
+                    case LevelIndex.DEBUG:
+                        _itemsDebugCount++;
+                        break;
+                    case LevelIndex.INFO:
+                        _itemsInfoCount++;
+                        break;
+                    case LevelIndex.WARN:
+                        _itemsWarnCount++;
+                        break;
+                    case LevelIndex.ERROR:
+                        _itemsErrorCount++;
+                        break;
+                    case LevelIndex.FATAL:
+                        _itemsFatalCount++;
+                        break;
+                }
             }
             _allItems = list;
         }
@@ -1519,26 +1540,11 @@ namespace YALV.ViewModel
 
         private void updateCounters()
         {
-            ItemsDebugCount = (from it in Items
-                               where it.Level.Equals("DEBUG", StringComparison.OrdinalIgnoreCase)
-                               select it).Count();
-
-            ItemsInfoCount = (from it in Items
-                              where it.Level.Equals("INFO", StringComparison.OrdinalIgnoreCase)
-                              select it).Count();
-
-            ItemsWarnCount = (from it in Items
-                              where it.Level.Equals("WARN", StringComparison.OrdinalIgnoreCase)
-                              select it).Count();
-
-            ItemsErrorCount = (from it in Items
-                               where it.Level.Equals("ERROR", StringComparison.OrdinalIgnoreCase)
-                               select it).Count();
-
-            ItemsFatalCount = (from it in Items
-                               where it.Level.Equals("FATAL", StringComparison.OrdinalIgnoreCase)
-                               select it).Count();
-
+            ItemsDebugCount = _itemsDebugCount;
+            ItemsInfoCount = _itemsInfoCount;
+            ItemsWarnCount = _itemsWarnCount;
+            ItemsErrorCount = _itemsErrorCount;
+            ItemsFatalCount = _itemsFatalCount;
             RefreshView();
         }
 
