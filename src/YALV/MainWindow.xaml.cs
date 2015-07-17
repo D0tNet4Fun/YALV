@@ -47,6 +47,7 @@ namespace YALV
             });
             _vm.InitDataGrid();
             _vm.RecentFileList = mainMenu.RecentFileList;
+            _vm.RecentFolderList = mainMenu.RecentFolderList;
             this.DataContext = _vm;
 
             //Assign events

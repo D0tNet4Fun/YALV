@@ -217,15 +217,6 @@ namespace YALV.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Line #.
-        /// </summary>
-        public static string ColumnSelection_ApplicationInfo_Line {
-            get {
-                return ResourceManager.GetString("ColumnSelection_ApplicationInfo_Line", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Machine name.
         /// </summary>
         public static string ColumnSelection_ApplicationInfo_MachineName {
@@ -537,6 +528,15 @@ namespace YALV.Properties {
         public static string Common_Components_MainMenu_FileMenu_RecentFiles_Header {
             get {
                 return ResourceManager.GetString("Common_Components_MainMenu_FileMenu_RecentFiles_Header", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Recent Folders.
+        /// </summary>
+        public static string Common_Components_MainMenu_FileMenu_RecentFolders_Header {
+            get {
+                return ResourceManager.GetString("Common_Components_MainMenu_FileMenu_RecentFolders_Header", resourceCulture);
             }
         }
         

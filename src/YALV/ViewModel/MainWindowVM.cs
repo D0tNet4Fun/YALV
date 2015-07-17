@@ -419,6 +419,27 @@ namespace YALV.ViewModel
         public static string PROP_RecentFileList = "RecentFileList";
 
         /// <summary>
+        /// RecentFileList Manager
+        /// </summary>
+        public RecentFolderList RecentFolderList
+        {
+            get { return _recentFolderList; }
+            set
+            {
+                _recentFolderList = value;
+                if (_recentFolderList != null)
+                {
+                    _recentFolderList.MenuClick += (s, e) =>
+                    {
+                        SelectedFolder = null;
+                        loadFolderFiles(e.Filepath);
+                    };
+                }
+            }
+        }
+        private RecentFolderList _recentFolderList;
+
+        /// <summary>
         /// IsLoading Property
         /// </summary>
         public bool IsLoading
@@ -1124,9 +1145,9 @@ namespace YALV.ViewModel
             }
 
             myJumpList.JumpItems.Clear();
-            if (RecentFileList != null && RecentFileList.RecentFiles != null)
+            if (RecentFileList != null && RecentFileList.Files != null)
             {
-                foreach (string item in RecentFileList.RecentFiles)
+                foreach (string item in RecentFileList.Files)
                 {
                     try
                     {
@@ -1220,6 +1241,11 @@ namespace YALV.ViewModel
                 if (!string.IsNullOrWhiteSpace(path))
                 {
                     RecentFileList.InsertFile(path);
+                    var folder = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrWhiteSpace(folder))
+                    {
+                        RecentFolderList.InsertFile(folder);
+                    }
                 }
                 updateJumpList();
                 Debug.Print("Done updating UI");

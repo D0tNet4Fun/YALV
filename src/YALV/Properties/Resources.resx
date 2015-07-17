@@ -204,6 +204,9 @@
   <data name="Common_Components_MainMenu_FileMenu_RecentFiles_Header" xml:space="preserve">
     <value>Recent Files</value>
   </data>
+  <data name="Common_Components_MainMenu_FileMenu_RecentFolders_Header" xml:space="preserve">
+    <value>Recent Folders</value>
+  </data>
   <data name="Common_Components_MainMenu_FileMenu_SelectFolder_Header" xml:space="preserve">
     <value>Open Folder...</value>
   </data>

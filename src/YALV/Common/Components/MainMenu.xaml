@@ -40,6 +40,12 @@
                 x:Name="RecentFileListMenu" />
         </MenuItem>
 
+        <MenuItem
+            Header="{x:Static Properties:Resources.Common_Components_MainMenu_FileMenu_RecentFolders_Header}">
+            <local:RecentFolderList
+                x:Name="RecentFolderListMenu" />
+        </MenuItem>
+
         <Separator />
         
         <MenuItem

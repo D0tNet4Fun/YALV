@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows;
@@ -18,18 +19,18 @@ namespace YALV.Common
     {
         public interface IPersist
         {
-            List<string> RecentFiles(int max);
+            List<string> LoadFiles(int max);
             void InsertFile(string filepath, int max);
             void RemoveFile(string filepath, int max);
         }
 
         public IPersist Persister { get; set; }
 
-        public void UseRegistryPersister() { Persister = new RegistryPersister(); }
         public void UseRegistryPersister(string key) { Persister = new RegistryPersister(key); }
+        public void UseRegistryPersister(string rootKey, string key) { Persister = new RegistryPersister(rootKey, key); }
 
-        public void UseXmlPersister() { Persister = new XmlPersister(); }
-        public void UseXmlPersister(string filepath) { Persister = new XmlPersister(filepath); }
+        public void UseXmlPersister(string fileName) { Persister = XmlPersister.FromFileName(fileName); }
+        public void UseXmlPersisterForPath(string filepath) { Persister = XmlPersister.FromFilePath(filepath); }
         public void UseXmlPersister(Stream stream) { Persister = new XmlPersister(stream); }
 
         public int MaxNumberOfFiles { get; set; }
@@ -58,7 +59,7 @@ namespace YALV.Common
 
         public RecentFileList()
         {
-            Persister = new RegistryPersister();
+            UseRegistryPersister("RecentFileList");
 
             MaxNumberOfFiles = 10;
             MaxPathLength = 150;
@@ -81,9 +82,15 @@ namespace YALV.Common
             FileMenu.SubmenuOpened += _FileMenu_SubmenuOpened;
         }
 
-        public List<string> RecentFiles { get { return Persister.RecentFiles(MaxNumberOfFiles); } }
+        public List<string> Files { get { return Persister.LoadFiles(MaxNumberOfFiles); } }
         public void RemoveFile(string filepath) { Persister.RemoveFile(filepath, MaxNumberOfFiles); }
-        public void InsertFile(string filepath) { Persister.InsertFile(filepath, MaxNumberOfFiles); }
+        public void InsertFile(string filepath)
+        {
+            if (!Files.Contains(filepath, StringComparer.InvariantCultureIgnoreCase))
+            {
+                Persister.InsertFile(filepath, MaxNumberOfFiles);
+            }
+        }
 
         void _FileMenu_SubmenuOpened(object sender, RoutedEventArgs e)
         {
@@ -269,7 +276,7 @@ namespace YALV.Common
 
         List<RecentFile> LoadRecentFilesCore()
         {
-            List<string> list = RecentFiles;
+            List<string> list = Files;
 
             List<RecentFile> files = new List<RecentFile>(list.Count);
 
@@ -403,23 +410,21 @@ namespace YALV.Common
         {
             public string RegistryKey { get; set; }
 
-            public RegistryPersister()
+            public RegistryPersister(string key)
+                : this("Software\\" + ApplicationAttributes.CompanyName + "\\" + ApplicationAttributes.ProductName + "\\",
+                       key)
             {
-                RegistryKey =
-                    "Software\\" +
-                    ApplicationAttributes.CompanyName + "\\" +
-                    ApplicationAttributes.ProductName + "\\" +
-                    "RecentFileList";
+
             }
 
-            public RegistryPersister(string key)
+            public RegistryPersister(string rootKey, string key)
             {
-                RegistryKey = key;
+                RegistryKey = rootKey + "\\" + key;
             }
 
             string Key(int i) { return i.ToString("00"); }
 
-            public List<string> RecentFiles(int max)
+            public List<string> LoadFiles(int max)
             {
                 RegistryKey k = Registry.CurrentUser.OpenSubKey(RegistryKey);
                 if (k == null) k = Registry.CurrentUser.CreateSubKey(RegistryKey);
@@ -507,12 +512,7 @@ namespace YALV.Common
 
             public XmlPersister()
             {
-                Filepath =
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        ApplicationAttributes.CompanyName + "\\" +
-                        ApplicationAttributes.ProductName + "\\" +
-                        "RecentFileList.xml");
+
             }
 
             public XmlPersister(string filepath)
@@ -525,7 +525,35 @@ namespace YALV.Common
                 Stream = stream;
             }
 
-            public List<string> RecentFiles(int max)
+            public static XmlPersister FromFileName(string fileName)
+            {
+                if (Path.IsPathRooted(fileName))
+                {
+                    throw new ArgumentException("The file name is an absolute path", "fileName");
+                }
+                return new XmlPersister
+                {
+                    Filepath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\" +
+                        ApplicationAttributes.CompanyName + "\\" +
+                        ApplicationAttributes.ProductName,
+                        fileName)
+                };
+            }
+
+            public static XmlPersister FromFilePath(string filePath)
+            {
+                if (!Path.IsPathRooted(filePath))
+                {
+                    throw new ArgumentException("The file path is not an absolute path", "filePath");
+                }
+                return new XmlPersister
+                {
+                    Filepath = filePath
+                };
+            }
+
+            public List<string> LoadFiles(int max)
             {
                 return Load(max);
             }
@@ -733,5 +761,13 @@ namespace YALV.Common
 
         //-----------------------------------------------------------------------------------------
 
+    }
+
+    public class RecentFolderList : RecentFileList
+    {
+        public RecentFolderList()
+        {
+            UseRegistryPersister("RecentFolderList");
+        }
     }
 }

@@ -26,9 +26,17 @@ namespace YALV.Common
 
         public RecentFileList RecentFileList
         {
-            get 
+            get
             {
                 return this.RecentFileListMenu;
+            }
+        }
+
+        public RecentFolderList RecentFolderList
+        {
+            get
+            {
+                return this.RecentFolderListMenu;
             }
         }
     }
