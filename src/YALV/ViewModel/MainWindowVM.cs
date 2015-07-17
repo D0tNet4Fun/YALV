@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -904,6 +905,8 @@ namespace YALV.ViewModel
             if (!add)
                 FileList.Clear();
 
+            var fileComparer = new FileComparer(CultureInfo.GetCultureInfo(Resources.CultureName));
+
             foreach (string path in pathList)
             {
                 string fileName = Path.GetFileName(path);
@@ -920,7 +923,7 @@ namespace YALV.ViewModel
                         refreshCommandsCanExecute();
                     }
                 };
-                FileList.Add(newItem);
+                FileList.AddSorted(newItem, f => f.FileName, fileComparer);
             }
 
             if (_isFileSelectionEnabled)

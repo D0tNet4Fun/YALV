@@ -106,6 +106,8 @@
       <DependentUpon>AddFolderPath.xaml</DependentUpon>
     </Compile>
     <Compile Include="Common\AllFilesItem.cs" />
+    <Compile Include="Common\FileComparer.cs" />
+    <Compile Include="Common\Utils.cs" />
     <Compile Include="SelectColumns.xaml.cs">
       <DependentUpon>SelectColumns.xaml</DependentUpon>
     </Compile>
