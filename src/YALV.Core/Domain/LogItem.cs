@@ -37,11 +37,8 @@ namespace YALV.Core.Domain
             get { return _level; }
             set
             {
-                if (value != _level)
-                {
-                    _level = value;
-                    assignLevelIndex(_level);
-                }
+                _level = value;
+                assignLevelIndex(_level);
             }
         }
 
