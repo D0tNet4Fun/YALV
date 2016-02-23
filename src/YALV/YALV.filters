@@ -1,0 +1,7 @@
+<xml version="1.0" encoding="utf-8">
+  <!-- relations for String properties: is, isNot, beginsWith, endsWith, contains, excludes, matchesRegex -->
+  <!-- relations for DateTime properties: before, after, between -->
+  <filters>
+    <!-- <filter property="TimeStamp" relation="before" value="06/30/2015 04:00:00" mode="exclude" /> -->
+  </filters>
+</xml>

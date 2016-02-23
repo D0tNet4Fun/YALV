@@ -1,13 +1,17 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-using YALV.Core;
 using YALV.Core.Domain;
+using YALV.Core.Filters;
+using YALV.Properties;
 
 namespace YALV.Common
 {
@@ -22,6 +26,7 @@ namespace YALV.Common
             _filterPropertyList = new List<string>();
             _txtCache = new Hashtable();
             IsFilteringEnabled = true;
+            _filters = new ObservableCollection<IFilter>();
         }
 
         protected override void OnDispose()
@@ -48,6 +53,7 @@ namespace YALV.Common
         protected KeyEventHandler _keyUpEvent;
         protected CollectionViewSource _cvs;
         protected Hashtable _txtCache;
+        private readonly ObservableCollection<IFilter> _filters;
 
         #endregion
 
@@ -64,6 +70,16 @@ namespace YALV.Common
             BindingOperations.ClearBinding(_dg, DataGrid.ItemsSourceProperty);
             Binding bind = new Binding() { Source = _cvs, Mode = BindingMode.OneWay };
             _dg.SetBinding(DataGrid.ItemsSourceProperty, bind);
+        }
+
+        public void LoadFilters(IEnumerable<IFilter> filters)
+        {
+            _filters.Clear();
+            foreach (var filter in filters)
+            {
+                filter.Culture = CultureInfo.GetCultureInfo(Resources.CultureName);
+                _filters.Add(filter);
+            }
         }
 
         public ICollectionView GetCollectionView()
@@ -180,6 +196,37 @@ namespace YALV.Common
                         }
                         if (!res)
                             return res;
+                    }
+
+                    if (_filters.Count > 0)
+                    {
+                        var logItem = (LogItem)item;
+
+                        // pass the item thru every filter;
+                        // exclusive filters need to be first; if the item is excluded by one of these then return false;
+                        // inclusive filters are next; if the item is explicitly included by one of these then return true;
+                        // if at least one inclusive filter decided the item can be excluded and no other inclusive filter has requested the inclusion of the item,
+                        // then return false.
+
+                        var canBeExcluded = false;
+                        foreach (var filter in _filters.OrderByDescending(f => f.Mode == FilterMode.Exclude))
+                        {
+                            var filterResult = filter.Apply(logItem);
+                            switch (filterResult)
+                            {
+                                case FilterResult.Exclude:
+                                    return false;
+                                case FilterResult.CanExclude:
+                                    canBeExcluded = true;
+                                    break;
+                                case FilterResult.Include:
+                                    return true;
+                            }
+                        }
+                        if (canBeExcluded)
+                        {
+                            return false;
+                        }
                     }
                 }
                 res = true;
