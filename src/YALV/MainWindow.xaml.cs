@@ -17,6 +17,7 @@
 using System;
 using System.Configuration;
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -38,7 +39,7 @@ namespace YALV
             InitializeComponent();
 
             //Initialize and assign ViewModel
-            MainWindowVM _vm = new MainWindowVM(this);
+            MainWindowVM _vm = new MainWindowVM(this, TaskScheduler.Default);
             _vm.GridManager = new FilteredGridManager(dgItems, txtSearchPanel, delegate(object sender, KeyEventArgs e)
             {
                 if (e.OriginalSource is TextBox)

@@ -94,14 +94,12 @@ namespace YALV.Core
             }
         }
 
-        public static IList<LogItem> ParseLogFile(string path)
+        public static IEnumerable<LogItem> ParseLogFile(string path)
         {
-            IEnumerable<LogItem> result = null;
             try
             {
                 AbstractEntriesProvider provider = EntriesProviderFactory.GetProvider();
-                result = provider.GetEntries(path);
-                return result.ToList();
+                return provider.GetEntries(path);
             }
             catch (Exception ex)
             {
