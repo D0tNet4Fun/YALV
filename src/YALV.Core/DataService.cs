@@ -3,15 +3,19 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Xml;
 using System.Xml.Linq;
 using YALV.Core.Domain;
+using YALV.Core.Filters;
 using YALV.Core.Providers;
 
 namespace YALV.Core
 {
     public static class DataService
     {
+        private static readonly Dictionary<string, PropertyInfo> LogItemProperties = typeof(LogItem).GetProperties().ToDictionary(p => p.Name);
+
         public static void SaveFolderFile(IList<PathItem> folders, string path)
         {
             FileStream fileStream = null;
@@ -175,6 +179,90 @@ namespace YALV.Core
                 Trace.TraceError("Error saving column settings in file {0}:\r\n{1}", path, ex.ToString());
                 throw;
             }
+        }
+
+        public static IEnumerable<IFilter> ParseFilters(string path)
+        {
+            if (!File.Exists(path))
+            {
+                yield break;
+            }
+
+            using (var fileStream = File.OpenRead(path))
+            using (var reader = new XmlTextReader(fileStream))
+            {
+                while (reader.ReadToFollowing("filter"))
+                {
+                    IFilter filter;
+                    try
+                    {
+                        filter = ParseFilter(reader);
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceError(string.Format("Error parsing filter: {0}", ex));
+                        continue;
+                    }
+                    yield return filter;
+                }
+            }
+        }
+
+        private static IFilter ParseFilter(XmlReader reader)
+        {
+            var propertyName = reader.GetAttribute("property");
+            PropertyInfo property;
+            if (!LogItemProperties.TryGetValue(propertyName, out property))
+            {
+                throw new MissingMemberException(typeof(LogItem).FullName, propertyName);
+            }
+
+            var relationString = reader.GetAttribute("relation");
+
+            IFilter filter;
+            if (property.PropertyType == typeof(string))
+            {
+                var stringFilter = new StringFilter(propertyName);
+                StringRelation relation;
+                if (Enum.TryParse(relationString, true, out relation))
+                {
+                    stringFilter.Relation = relation;
+                }
+                if (reader.MoveToAttribute("value"))
+                {
+                    stringFilter.Value = reader.Value;
+                }
+                filter = stringFilter;
+            }
+            else if (property.PropertyType == typeof(DateTime))
+            {
+                var dateTimeFilter = new DateTimeFilter(propertyName);
+                DateTimeRelation relation;
+                if (Enum.TryParse(relationString, true, out relation))
+                {
+                    dateTimeFilter.Relation = relation;
+                }
+                if (reader.MoveToAttribute("value"))
+                {
+                    dateTimeFilter.Value = DateTime.Parse(reader.Value);
+                }
+                if (reader.MoveToAttribute("value2"))
+                {
+                    dateTimeFilter.Value2 = DateTime.Parse(reader.Value);
+                }
+                filter = dateTimeFilter;
+            }
+            else
+            {
+                throw new NotSupportedException(string.Format("Cannot filter property {0} of type {1}", propertyName, property.PropertyType.FullName));
+            }
+
+            FilterMode mode;
+            if (Enum.TryParse(reader.GetAttribute("mode"), true, out mode))
+            {
+                filter.Mode = mode;
+            }
+            return filter;
         }
     }
 }

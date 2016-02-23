@@ -1361,6 +1361,10 @@ namespace YALV.ViewModel
 
                 GridManager.BuildDataGrid(dgColumns);
                 GridManager.AssignSource(new Binding(MainWindowVM.PROP_Items) { Source = this, Mode = BindingMode.OneWay });
+
+                var filters = DataService.ParseFilters(Constants.FILTERS_FILE_PATH);
+                GridManager.LoadFilters(filters);
+
                 GridManager.OnBeforeCheckFilter = levelCheckFilter;
             }
         }

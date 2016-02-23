@@ -55,6 +55,12 @@
     <Compile Include="Domain\LogItem.cs" />
     <Compile Include="Domain\PathItem.cs" />
     <Compile Include="Exceptions\NotValidValueException.cs" />
+    <Compile Include="Filters\DateTimeFilter.cs" />
+    <Compile Include="Filters\FilterBase.cs" />
+    <Compile Include="Filters\FilterMode.cs" />
+    <Compile Include="Filters\FilterResult.cs" />
+    <Compile Include="Filters\IFilter.cs" />
+    <Compile Include="Filters\StringFilter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Providers\AbstractEntriesProvider.cs" />
     <Compile Include="Providers\AbstractEntriesProviderBase.cs" />
@@ -63,6 +69,7 @@
     <Compile Include="Providers\MsSqlServerEntriesProvider.cs" />
     <Compile Include="Providers\SqliteEntriesProvider.cs" />
     <Compile Include="Providers\XmlEntriesProvider.cs" />
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
