@@ -445,14 +445,23 @@ namespace YALV.ViewModel
                 _isFileSelectionEnabled = value;
                 RaisePropertyChanged(PROP_IsFileSelectionEnabled);
 
+                var hasAllFilesItem = FileList.Count >= 1 && FileList[0] is AllFilesItem;
                 if (_isFileSelectionEnabled)
                 {
+                    if (!hasAllFilesItem)
+                    {
+                        FileList.Insert(0, new AllFilesItem(FileList.ToArray()));
+                    }
                     Items.Clear();
-                    if (FileList.Count > 0 && SelectedFile != null)
+                    if (FileList.Count > 1 && SelectedFile != null)
                         SelectedFile.Checked = true;
                 }
                 else
                 {
+                    if (hasAllFilesItem)
+                    {
+                        FileList.RemoveAt(0);
+                    }
                     Items.Clear();
                     foreach (FileItem item in FileList)
                         item.Checked = false;
@@ -916,18 +925,29 @@ namespace YALV.ViewModel
                 FileList.Add(newItem);
             }
 
+            if (_isFileSelectionEnabled)
+            {
+                var hasAllFilesItem = FileList.Count >= 1 && FileList[0] is AllFilesItem;
+                if (!hasAllFilesItem)
+                {
+                    FileList.Insert(0, new AllFilesItem(FileList.ToArray()));
+                }
+            }
+
             _loadingFileList = false;
 
             //Load item if only one
-            if (FileList.Count == 1)
+            if (IsFileSelectionEnabled)
             {
-                if (IsFileSelectionEnabled)
+                if (FileList.Count == 2)
                 {
-                    SelectedFile = FileList[0];
+                    SelectedFile = FileList[1];
                     SelectedFile.Checked = true;
                 }
-                else
-                    SelectedFile = FileList[0];
+            }
+            else if (FileList.Count == 1)
+            {
+                SelectedFile = FileList[0];
             }
         }
 

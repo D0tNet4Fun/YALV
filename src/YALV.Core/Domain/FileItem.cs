@@ -8,7 +8,7 @@ namespace YALV.Core.Domain
         /// <summary>
         /// Checked Property
         /// </summary>
-        public bool Checked
+        public virtual bool Checked
         {
             get { return _checked; }
             set
