@@ -932,7 +932,7 @@ namespace YALV.ViewModel
             {
                 string fileName = Path.GetFileName(path);
                 FileItem newItem = new FileItem(fileName, path);
-                newItem.PropertyChanged += delegate(object sender, PropertyChangedEventArgs e)
+                newItem.PropertyChanged += delegate (object sender, PropertyChangedEventArgs e)
                 {
                     if (e.PropertyName.Equals(FileItem.PROP_Checked))
                     {
@@ -1267,8 +1267,8 @@ namespace YALV.ViewModel
         private void PostProcessItems()
         {
             var list = _allItems.ToList();
-            list.Sort((x, y) => x.TimeStamp.CompareTo(y.TimeStamp));
-
+            var comparer = new LogItemComparer(list);
+            list.Sort(comparer);
             _itemsDebugCount = _itemsInfoCount = _itemsWarnCount = _itemsErrorCount = _itemsFatalCount = 0;
             var id = 1;
             foreach (var item in list)
@@ -1749,6 +1749,25 @@ namespace YALV.ViewModel
                     return 1;
                 }
                 return _map[x].DisplayIndex.CompareTo(_map[y].DisplayIndex);
+            }
+        }
+
+        public class LogItemComparer : IComparer<LogItem>
+        {
+            private readonly List<LogItem> _list;
+
+            public LogItemComparer(List<LogItem> list)
+            {
+                _list = list;
+            }
+
+            public int Compare(LogItem x, LogItem y)
+            {
+                if (x.TimeStamp == y.TimeStamp)
+                {
+                    return _list.IndexOf(x).CompareTo(_list.IndexOf(y));
+                }
+                return x.TimeStamp.CompareTo(y.TimeStamp);
             }
         }
     }
